@@ -1,4 +1,22 @@
 {
   "scenes": [
+    {
+      "name": "Crytek Sponza",
+      "root": "vendor/crytek_sponza",
+      "asset": "sponza.obj",
+      "format": "obj",
+      "default_camera": "main",
+      "exposure": 1.0,
+      "notes": "Bundled from McGuire Computer Graphics Archive. CC BY 3.0. Copyright 2010 Frank Meinl, Crytek."
+    },
+    {
+      "name": "Gallery",
+      "root": "vendor/gallery",
+      "asset": "gallery.obj",
+      "format": "obj",
+      "default_camera": "main",
+      "exposure": 1.0,
+      "notes": "Bundled from McGuire Computer Graphics Archive. CC BY-SA 4.0. Copyright 2017 The Hallwyl Museum."
+    }
   ]
 }

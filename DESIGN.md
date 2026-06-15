@@ -148,9 +148,9 @@ The renderer should output one resolved scene color texture. SMAA should not kno
 
 Current scene rendering is intentionally utilitarian. It supports material diffuse color and diffuse texture sampling for AA test visibility, but does not yet aim to reproduce archive reference renders with full lighting, normal maps, specular maps, or physically based materials.
 
-Scene navigation should be practical enough for repeatable AA captures. The current camera is an orbit camera with target offsets, FOV, exposure, mouse orbit, and keyboard movement. Per-scene saved camera presets can be added after Sponza/Gallery framing is validated.
+Scene navigation should be practical enough for repeatable AA captures. The current camera is a third-person orbit camera with target/pivot offsets, yaw/pitch, target distance, FOV, exposure, middle-mouse orbit toggle, mouse-wheel distance zoom, WASD view-relative target movement, Q/E yaw rotation, Shift move speed boost, and reset. Per-scene saved camera presets can be added after Sponza/Gallery framing is validated.
 
-The UI should keep source-specific controls out of unrelated workflows. Image mode shows image loading controls only; scene mode shows scene selection, render size, and camera controls. Scene entries should load on selection, with a reload action only for explicitly refreshing the current scene.
+The UI should keep source-specific controls out of unrelated workflows. The primary control is a CMAA2-style Source selector that can list generated patterns, static images, and registered scenes together. Source selection should queue the load request, and the actual image or scene load should happen outside the ImGui widget call. Image-path controls, scene-library metadata, render size, and camera controls belong under Advanced and should only appear when relevant to the selected or loaded source.
 
 ## Original SMAA Isolation
 
@@ -195,8 +195,8 @@ Both variants must preserve the same three-pass output contract unless a design 
 Initial UI controls:
 
 - AA mode: `No AA`, `Original SMAA`, `Improved SMAA` when available.
-- Input mode: static image or scene.
-- Scene selector: registered scene list, reload, and open/import action.
+- Source selector: generated pattern, static images, and registered scenes in one list.
+- Scene reload/rescan: explicit refresh action that updates the source list without silently changing the loaded frame.
 - View mode: final output, split view, difference view, intermediate textures.
 - SMAA preset: low, medium, high, ultra.
 - Edge input mode: luma first; color and depth can be added after baseline validation.

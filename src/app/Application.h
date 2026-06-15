@@ -12,6 +12,7 @@
 #include <array>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace app {
 
@@ -43,17 +44,37 @@ private:
         BlendWeights = 4,
     };
 
+    enum class SourceType {
+        GeneratedPattern = 0,
+        ImageFile = 1,
+        Scene = 2,
+    };
+
+    struct SourceEntry {
+        SourceType type = SourceType::GeneratedPattern;
+        std::string label;
+        std::filesystem::path path;
+        int sceneIndex = -1;
+    };
+
     void initialize(int argc, char** argv);
     void shutdown();
     void mainLoop();
     void renderFrame();
     void drawUi();
-    void drawInputPanel();
-    void drawScenePanel();
-    void drawComparisonPanel();
-    void loadImageFromUi();
+    void drawSourcePanel();
+    void drawAaPanel();
+    void drawInspectPanel();
+    void drawStatsPanel();
+    void drawAdvancedPanel();
+    void rebuildSourceEntries();
+    void requestLoadSelectedSource();
+    void processPendingSourceLoad();
+    void loadSelectedSource();
+    bool loadImageFromUi();
+    bool loadImagePath(const std::filesystem::path& path);
     void reloadSceneManifest();
-    void loadSelectedScene();
+    bool loadSelectedScene();
     void resetSceneCamera(float exposure);
     void updateSceneCameraInput();
     void resizeSmaaTargets(int sourceWidth, int sourceHeight);
@@ -87,7 +108,13 @@ private:
     float diffScale_ = 8.0f;
     int sceneRenderWidth_ = 1280;
     int sceneRenderHeight_ = 720;
+    std::vector<SourceEntry> sourceEntries_;
+    int selectedSource_ = 0;
+    int loadedSource_ = 0;
+    bool pendingSourceLoad_ = false;
     int selectedScene_ = -1;
+    bool sceneMouseOrbitEnabled_ = false;
+    bool sceneMiddleMouseWasDown_ = false;
     bool rotatingSceneCamera_ = false;
     double lastSceneCameraTime_ = 0.0;
     double lastSceneCursorX_ = 0.0;

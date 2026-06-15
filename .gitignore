@@ -12,3 +12,5 @@ out/
 assets/scenes/*
 !assets/scenes/README.md
 !assets/scenes/scenes.json
+!assets/scenes/vendor/
+!assets/scenes/vendor/**

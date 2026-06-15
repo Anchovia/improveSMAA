@@ -458,19 +458,20 @@ void SceneRenderer::render(const SceneCamera& camera) {
         bounds_.maxZ - bounds_.minZ,
     };
     const float radius = std::max({extent.x, extent.y, extent.z, 0.001f}) * 0.5f;
-    const Vec3 center = boundsCenter + Vec3{
+    const Vec3 target = boundsCenter + Vec3{
         camera.targetOffsetX,
         camera.targetOffsetY,
         camera.targetOffsetZ,
     } * radius;
     const float cp = std::cos(camera.pitch);
-    const Vec3 eye = center + Vec3{
+    const Vec3 orbitOffset{
         std::sin(camera.yaw) * cp,
         std::sin(camera.pitch),
         std::cos(camera.yaw) * cp,
-    } * (radius * camera.distance);
+    };
+    const Vec3 eye = target + orbitOffset * (radius * camera.distance);
 
-    const Mat4 view = lookAt(eye, center, Vec3{0.0f, 1.0f, 0.0f});
+    const Mat4 view = lookAt(eye, target, Vec3{0.0f, 1.0f, 0.0f});
     const float fovRadians = std::clamp(camera.fovDegrees, 25.0f, 100.0f) * 3.14159265f / 180.0f;
     const Mat4 proj = perspective(fovRadians, static_cast<float>(width_) / static_cast<float>(height_), radius * 0.005f, radius * 20.0f);
     const Mat4 mvp = multiply(proj, view);
@@ -506,6 +507,26 @@ void SceneRenderer::render(const SceneCamera& camera) {
     }
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+SceneCamera SceneRenderer::defaultCamera(float exposure) const {
+    SceneCamera camera{};
+    camera.exposure = exposure;
+
+    if (vertexCount_ == 0) {
+        return camera;
+    }
+
+    const float fovRadians = camera.fovDegrees * 3.14159265f / 180.0f;
+    const float fitDistance = 1.25f / std::tan(fovRadians * 0.5f);
+
+    camera.yaw = 0.75f;
+    camera.pitch = 0.22f;
+    camera.distance = std::clamp(fitDistance, 1.4f, 4.0f);
+    camera.targetOffsetX = 0.0f;
+    camera.targetOffsetY = 0.0f;
+    camera.targetOffsetZ = 0.0f;
+    return camera;
 }
 
 void SceneRenderer::createFramebuffer() {

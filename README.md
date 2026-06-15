@@ -97,8 +97,9 @@ These are still worth deciding after the first code pass:
 - Original SMAA three-pass wrapper using upstream `SMAA.hlsl`, `AreaTex.h`, and `SearchTex.h`.
 - Adaptive SMAA and Adaptive + TSCMAA SMAA placeholder modes. They currently run the same copied SMAA 1x pipeline and have separate shader directories for experiments.
 - View modes for final, split, difference, edges, and blend weights.
-- Scene manifest loading from `assets/scenes/scenes.json` or a local ignored manifest such as `assets/scenes/local.scenes.json`; the app prefers `local.scenes.json` when it exists.
-- Scene entries load immediately when selected from the UI scene list.
-- Input controls are source-specific: image controls are hidden in scene mode, and scene controls are hidden in image mode.
+- Scene manifest loading defaults to bundled `assets/scenes/scenes.json`; an ignored `assets/scenes/local.scenes.json` can still be selected manually from Advanced for machine-specific scene paths.
+- A unified Source selector lists the generated pattern, images discovered under `assets/test_images/`, and registered OBJ scenes.
+- Source changes are queued from the UI and loaded at the start of the next frame instead of performing heavy scene loads inside ImGui widget handling.
+- Source-specific details live under Advanced: image path controls stay separate from scene render/camera controls, and scene controls are hidden during normal image testing.
 - OBJ scene rendering through `tinyobjloader`, including `vt` coordinates and `map_Kd` diffuse textures; the rendered scene color texture feeds the same SMAA comparison path as images.
-- Scene camera controls include yaw, pitch, distance, target offset, FOV, exposure, reset, mouse orbit, and keyboard target movement.
+- Scene camera controls use a third-person orbit camera: middle-mouse click toggles mouse orbit, mouse-wheel distance zoom, WASD view-relative target movement, Q/E yaw rotation, Shift move speed boost, and reset.

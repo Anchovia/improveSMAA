@@ -47,10 +47,13 @@ Implementation added:
 - Added ignored local scene manifest workflow for downloaded Sponza/Gallery test scenes.
 - Extended the OBJ renderer to read `vt` coordinates and MTL `map_Kd` diffuse textures, with material-color fallback.
 - Filtered noisy OBJ/MTL duplicate dissolve warnings from the scene-load status text.
-- Added movable scene camera controls with target offsets, reset, mouse orbit, and keyboard target movement.
-- Changed the scene list UX so selecting a scene immediately loads it; the explicit button now reloads the selected scene.
+- Replaced the temporary FPS-style free camera with a third-person orbit camera: target/pivot offsets, yaw/pitch, target distance, middle-mouse orbit toggle, mouse-wheel distance zoom, WASD view-relative target movement, Q/E yaw rotation, Shift move speed boost, and scene-aware reset.
+- Replaced the earlier separate scene list with the unified Source selector described below.
 - Hid source-specific controls outside their input mode: scene controls are not shown in image mode, and image file controls are not shown in scene mode.
 - Simplified the scene panel by keeping manifest and scene metadata in collapsible sections.
+- Reworked the main UI around a CMAA2-style Source selector that lists generated pattern, discovered test images, and registered OBJ scenes together.
+- Moved image path editing, scene metadata, render size, and camera controls into Advanced so normal image testing is not polluted by scene controls.
+- Changed source selection to queue load requests and process them at the start of the next frame instead of loading scenes directly from ImGui selection callbacks.
 
 Remaining decisions:
 
@@ -62,4 +65,4 @@ Remaining decisions:
 
 Next planned step:
 
-User build validation, then shader/runtime fixes if needed.
+User build validation of the Source selector UI, then shader/runtime fixes if needed.

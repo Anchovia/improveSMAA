@@ -13,11 +13,14 @@ namespace render {
 
 struct SceneCamera {
     float yaw = 0.75f;
-    float pitch = 0.15f;
-    float distance = 0.45f;
+    float pitch = 0.22f;
+    float distance = 2.2f;
     float targetOffsetX = 0.0f;
-    float targetOffsetY = -0.15f;
+    float targetOffsetY = 0.0f;
     float targetOffsetZ = 0.0f;
+    float orbitSensitivity = 0.0025f;
+    float zoomSpeed = 0.12f;
+    float panSpeed = 0.45f;
     float fovDegrees = 65.0f;
     float exposure = 1.0f;
 };
@@ -34,6 +37,7 @@ public:
         std::string& error);
     void resize(int width, int height);
     void render(const SceneCamera& camera);
+    SceneCamera defaultCamera(float exposure) const;
 
     GLuint colorTexture() const { return colorTex_.id(); }
     int width() const { return width_; }
