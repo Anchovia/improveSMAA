@@ -1,0 +1,14 @@
+build/
+out/
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.ninja_log
+*.ninja_deps
+
+# Keep downloaded benchmark scenes out of git unless explicitly curated.
+assets/scenes/*
+!assets/scenes/README.md
+!assets/scenes/scenes.json
