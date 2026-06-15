@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -48,6 +49,10 @@ std::string lowerCopy(std::string text) {
     return text;
 }
 
+float clampFloat(float value, float minValue, float maxValue) {
+    return std::max(minValue, std::min(value, maxValue));
+}
+
 } // namespace
 
 namespace app {
@@ -78,7 +83,9 @@ void Application::initialize(int argc, char** argv) {
     shaderRoot_ = rootDir_ / "shaders";
     smaaRoot_ = rootDir_ / "external" / "iryoku_smaa";
 
-    setBuffer(sceneManifestPath_, (rootDir_ / "assets" / "scenes" / "scenes.json").string());
+    const auto defaultSceneManifest = rootDir_ / "assets" / "scenes" / "scenes.json";
+    const auto localSceneManifest = rootDir_ / "assets" / "scenes" / "local.scenes.json";
+    setBuffer(sceneManifestPath_, (std::filesystem::exists(localSceneManifest) ? localSceneManifest : defaultSceneManifest).string());
 
     glfwSetErrorCallback(glfwErrorCallback);
     if (glfwInit() != GLFW_TRUE) {
@@ -162,6 +169,8 @@ void Application::mainLoop() {
 }
 
 void Application::renderFrame() {
+    updateSceneCameraInput();
+
     int framebufferWidth = 0;
     int framebufferHeight = 0;
     glfwGetFramebufferSize(window_, &framebufferWidth, &framebufferHeight);
@@ -225,14 +234,16 @@ void Application::renderFrame() {
 
 void Application::drawUi() {
     ImGui::SetNextWindowPos(ImVec2(16.0f, 16.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(430.0f, 620.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(430.0f, 520.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("improveSMAA");
 
     drawInputPanel();
     ImGui::Separator();
+    if (inputMode_ == InputMode::Scene) {
+        drawScenePanel();
+        ImGui::Separator();
+    }
     drawComparisonPanel();
-    ImGui::Separator();
-    drawScenePanel();
 
     if (!statusText_.empty()) {
         ImGui::Separator();
@@ -253,12 +264,23 @@ void Application::drawInputPanel() {
     const char* inputLabels[] = {"Image", "Scene"};
     if (ImGui::Combo("Input mode", &inputMode, inputLabels, IM_ARRAYSIZE(inputLabels))) {
         inputMode_ = static_cast<InputMode>(inputMode);
+        if (inputMode_ == InputMode::Scene && !sceneRenderer_.hasScene() && selectedScene_ >= 0) {
+            loadSelectedScene();
+        } else if (inputMode_ == InputMode::Image) {
+            statusText_.clear();
+            errorText_.clear();
+            rotatingSceneCamera_ = false;
+        }
     }
 
-    if (inputMode_ == InputMode::Scene && sceneRenderer_.hasScene()) {
-        ImGui::Text("Current: %s", sceneRenderer_.label().c_str());
+    if (inputMode_ == InputMode::Scene) {
+        ImGui::Text("Current: %s", sceneRenderer_.hasScene() ? sceneRenderer_.label().c_str() : "No scene");
     } else {
         ImGui::Text("Current: %s", image_.label().c_str());
+    }
+
+    if (inputMode_ != InputMode::Image) {
+        return;
     }
 
     ImGui::InputText("Image path", imagePath_.data(), imagePath_.size());
@@ -310,15 +332,16 @@ void Application::drawComparisonPanel() {
 }
 
 void Application::drawScenePanel() {
-    ImGui::TextUnformatted("Scene Library");
-    ImGui::InputText("Manifest", sceneManifestPath_.data(), sceneManifestPath_.size());
-    if (ImGui::Button("Reload scenes")) {
-        reloadSceneManifest();
-    }
+    ImGui::TextUnformatted("Scenes");
 
     const auto& scenes = sceneLibrary_.scenes();
     if (scenes.empty()) {
-        ImGui::TextWrapped("No scenes registered. Edit assets/scenes/scenes.json after downloading test scenes.");
+        if (ImGui::Button("Reload scenes")) {
+            reloadSceneManifest();
+        }
+        if (ImGui::CollapsingHeader("Manifest")) {
+            ImGui::InputText("Path", sceneManifestPath_.data(), sceneManifestPath_.size());
+        }
         return;
     }
 
@@ -326,30 +349,52 @@ void Application::drawScenePanel() {
         const bool selected = selectedScene_ == i;
         if (ImGui::Selectable(scenes[static_cast<size_t>(i)].name.c_str(), selected)) {
             selectedScene_ = i;
+            loadSelectedScene();
         }
     }
 
     if (selectedScene_ >= 0 && selectedScene_ < static_cast<int>(scenes.size())) {
         const auto& scene = scenes[static_cast<size_t>(selectedScene_)];
-        ImGui::Separator();
-        ImGui::Text("Root: %s", scene.root.string().c_str());
-        ImGui::Text("Asset: %s", scene.asset.string().c_str());
-        ImGui::Text("Format: %s", scene.format.c_str());
-        ImGui::Text("Camera: %s", scene.defaultCamera.c_str());
-        ImGui::Text("Exposure: %.3f", scene.exposure);
-        if (!scene.notes.empty()) {
-            ImGui::TextWrapped("%s", scene.notes.c_str());
-        }
-        if (ImGui::Button("Load selected OBJ scene")) {
+        ImGui::Spacing();
+        if (ImGui::Button("Reload scene")) {
             loadSelectedScene();
         }
+
+        if (ImGui::CollapsingHeader("Scene info")) {
+            ImGui::Text("Root: %s", scene.root.string().c_str());
+            ImGui::Text("Asset: %s", scene.asset.string().c_str());
+            ImGui::Text("Format: %s", scene.format.c_str());
+            ImGui::Text("Camera: %s", scene.defaultCamera.c_str());
+            ImGui::Text("Exposure: %.3f", scene.exposure);
+            if (!scene.notes.empty()) {
+                ImGui::TextWrapped("%s", scene.notes.c_str());
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Manifest")) {
+            ImGui::InputText("Path", sceneManifestPath_.data(), sceneManifestPath_.size());
+            if (ImGui::Button("Reload scenes")) {
+                reloadSceneManifest();
+            }
+        }
+
+        ImGui::TextUnformatted("Render");
         ImGui::InputInt("Scene width", &sceneRenderWidth_);
         ImGui::InputInt("Scene height", &sceneRenderHeight_);
         sceneRenderWidth_ = std::max(64, sceneRenderWidth_);
         sceneRenderHeight_ = std::max(64, sceneRenderHeight_);
+
+        ImGui::TextUnformatted("Camera");
+        if (ImGui::Button("Reset camera")) {
+            resetSceneCamera(scene.exposure);
+        }
         ImGui::SliderFloat("Yaw", &sceneCamera_.yaw, -3.14159f, 3.14159f);
         ImGui::SliderFloat("Pitch", &sceneCamera_.pitch, -1.3f, 1.3f);
-        ImGui::SliderFloat("Distance", &sceneCamera_.distance, 0.8f, 6.0f);
+        ImGui::SliderFloat("Distance", &sceneCamera_.distance, 0.05f, 6.0f);
+        ImGui::SliderFloat("Target X", &sceneCamera_.targetOffsetX, -1.5f, 1.5f);
+        ImGui::SliderFloat("Target Y", &sceneCamera_.targetOffsetY, -1.0f, 1.0f);
+        ImGui::SliderFloat("Target Z", &sceneCamera_.targetOffsetZ, -1.5f, 1.5f);
+        ImGui::SliderFloat("FOV", &sceneCamera_.fovDegrees, 25.0f, 100.0f);
         ImGui::SliderFloat("Exposure", &sceneCamera_.exposure, 0.1f, 4.0f);
     }
 }
@@ -377,6 +422,10 @@ void Application::reloadSceneManifest() {
     selectedScene_ = sceneLibrary_.scenes().empty() ? -1 : 0;
     statusText_ = "Loaded scene manifest: " + sceneLibrary_.manifestPath().string();
     errorText_.clear();
+
+    if (inputMode_ == InputMode::Scene && selectedScene_ >= 0) {
+        loadSelectedScene();
+    }
 }
 
 void Application::loadSelectedScene() {
@@ -399,13 +448,103 @@ void Application::loadSelectedScene() {
         return;
     }
 
-    sceneCamera_.exposure = scene.exposure;
+    resetSceneCamera(scene.exposure);
     inputMode_ = InputMode::Scene;
     statusText_ = "Loaded scene: " + scene.name;
     if (!error.empty()) {
         statusText_ += " (" + error + ")";
     }
     errorText_.clear();
+}
+
+void Application::resetSceneCamera(float exposure) {
+    sceneCamera_ = render::SceneCamera{};
+    sceneCamera_.exposure = exposure;
+    rotatingSceneCamera_ = false;
+}
+
+void Application::updateSceneCameraInput() {
+    if (window_ == nullptr) {
+        return;
+    }
+
+    const double now = glfwGetTime();
+    if (lastSceneCameraTime_ <= 0.0) {
+        lastSceneCameraTime_ = now;
+    }
+    const float dt = static_cast<float>(std::min(now - lastSceneCameraTime_, 0.1));
+    lastSceneCameraTime_ = now;
+
+    if (inputMode_ != InputMode::Scene || !sceneRenderer_.hasScene()) {
+        rotatingSceneCamera_ = false;
+        return;
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    double cursorX = 0.0;
+    double cursorY = 0.0;
+    glfwGetCursorPos(window_, &cursorX, &cursorY);
+
+    const bool rightMouseDown = glfwGetMouseButton(window_, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+    if (rightMouseDown && !io.WantCaptureMouse) {
+        if (rotatingSceneCamera_) {
+            const float dx = static_cast<float>(cursorX - lastSceneCursorX_);
+            const float dy = static_cast<float>(cursorY - lastSceneCursorY_);
+            sceneCamera_.yaw += dx * 0.006f;
+            sceneCamera_.pitch = clampFloat(sceneCamera_.pitch - dy * 0.006f, -1.45f, 1.45f);
+        }
+        rotatingSceneCamera_ = true;
+    } else {
+        rotatingSceneCamera_ = false;
+    }
+
+    lastSceneCursorX_ = cursorX;
+    lastSceneCursorY_ = cursorY;
+
+    if (io.WantCaptureKeyboard) {
+        return;
+    }
+
+    const float speed = (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                         glfwGetKey(window_, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+                            ? 0.75f
+                            : 0.25f;
+    const float step = speed * std::max(dt, 0.001f);
+    const float forwardX = -std::sin(sceneCamera_.yaw);
+    const float forwardZ = -std::cos(sceneCamera_.yaw);
+    const float rightX = std::cos(sceneCamera_.yaw);
+    const float rightZ = -std::sin(sceneCamera_.yaw);
+
+    if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) {
+        sceneCamera_.targetOffsetX += forwardX * step;
+        sceneCamera_.targetOffsetZ += forwardZ * step;
+    }
+    if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) {
+        sceneCamera_.targetOffsetX -= forwardX * step;
+        sceneCamera_.targetOffsetZ -= forwardZ * step;
+    }
+    if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) {
+        sceneCamera_.targetOffsetX += rightX * step;
+        sceneCamera_.targetOffsetZ += rightZ * step;
+    }
+    if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) {
+        sceneCamera_.targetOffsetX -= rightX * step;
+        sceneCamera_.targetOffsetZ -= rightZ * step;
+    }
+    if (glfwGetKey(window_, GLFW_KEY_E) == GLFW_PRESS) {
+        sceneCamera_.targetOffsetY += step;
+    }
+    if (glfwGetKey(window_, GLFW_KEY_Q) == GLFW_PRESS) {
+        sceneCamera_.targetOffsetY -= step;
+    }
+    if (glfwGetKey(window_, GLFW_KEY_R) == GLFW_PRESS) {
+        resetSceneCamera(sceneCamera_.exposure);
+    }
+
+    sceneCamera_.targetOffsetX = clampFloat(sceneCamera_.targetOffsetX, -1.5f, 1.5f);
+    sceneCamera_.targetOffsetY = clampFloat(sceneCamera_.targetOffsetY, -1.0f, 1.0f);
+    sceneCamera_.targetOffsetZ = clampFloat(sceneCamera_.targetOffsetZ, -1.5f, 1.5f);
+    sceneCamera_.distance = clampFloat(sceneCamera_.distance, 0.05f, 6.0f);
 }
 
 void Application::resizeSmaaTargets(int sourceWidth, int sourceHeight) {

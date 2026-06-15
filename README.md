@@ -97,5 +97,8 @@ These are still worth deciding after the first code pass:
 - Original SMAA three-pass wrapper using upstream `SMAA.hlsl`, `AreaTex.h`, and `SearchTex.h`.
 - Adaptive SMAA and Adaptive + TSCMAA SMAA placeholder modes. They currently run the same copied SMAA 1x pipeline and have separate shader directories for experiments.
 - View modes for final, split, difference, edges, and blend weights.
-- Scene manifest loading from `assets/scenes/scenes.json`.
-- First-pass OBJ scene rendering through `tinyobjloader`; the rendered scene color texture feeds the same SMAA comparison path as images.
+- Scene manifest loading from `assets/scenes/scenes.json` or a local ignored manifest such as `assets/scenes/local.scenes.json`; the app prefers `local.scenes.json` when it exists.
+- Scene entries load immediately when selected from the UI scene list.
+- Input controls are source-specific: image controls are hidden in scene mode, and scene controls are hidden in image mode.
+- OBJ scene rendering through `tinyobjloader`, including `vt` coordinates and `map_Kd` diffuse textures; the rendered scene color texture feeds the same SMAA comparison path as images.
+- Scene camera controls include yaw, pitch, distance, target offset, FOV, exposure, reset, mouse orbit, and keyboard target movement.

@@ -54,6 +54,7 @@ using GLchar = char;
 #define GL_COLOR 0x1800
 #define GL_DEPTH_COMPONENT24 0x81A6
 #define GL_CLAMP_TO_EDGE 0x812F
+#define GL_REPEAT 0x2901
 #define GL_RGBA8 0x8058
 #define GL_TEXTURE0 0x84C0
 #define GL_TEXTURE1 0x84C1

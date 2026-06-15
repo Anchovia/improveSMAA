@@ -4,6 +4,7 @@
 #include "gl/Texture2D.h"
 #include "render/SceneLibrary.h"
 
+#include <array>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -12,8 +13,12 @@ namespace render {
 
 struct SceneCamera {
     float yaw = 0.75f;
-    float pitch = 0.35f;
-    float distance = 2.4f;
+    float pitch = 0.15f;
+    float distance = 0.45f;
+    float targetOffsetX = 0.0f;
+    float targetOffsetY = -0.15f;
+    float targetOffsetZ = 0.0f;
+    float fovDegrees = 65.0f;
     float exposure = 1.0f;
 };
 
@@ -46,6 +51,18 @@ private:
         float maxZ = 0.0f;
     };
 
+    struct MeshBatch {
+        GLsizei firstVertex = 0;
+        GLsizei vertexCount = 0;
+        int materialIndex = 0;
+    };
+
+    struct SceneMaterial {
+        std::array<float, 3> diffuseColor = {0.74f, 0.76f, 0.78f};
+        gl::Texture2D diffuseTexture;
+        bool hasDiffuseTexture = false;
+    };
+
     void createFramebuffer();
     void uploadVertices(const std::vector<float>& vertices);
 
@@ -61,6 +78,8 @@ private:
     int height_ = 720;
     GLsizei vertexCount_ = 0;
     Bounds bounds_;
+    std::vector<MeshBatch> batches_;
+    std::vector<SceneMaterial> materials_;
     std::string label_ = "No scene";
 };
 

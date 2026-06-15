@@ -44,6 +44,13 @@ Implementation added:
 - Removed GLAD code generation and added a minimal in-repo OpenGL function loader to avoid Python `jinja2` build dependency.
 - Fixed shader include preprocessing so commented `#include` examples in upstream `SMAA.hlsl` are ignored.
 - Added Adaptive SMAA and Adaptive + TSCMAA SMAA placeholder modes using copied SMAA 1x shader wrappers.
+- Added ignored local scene manifest workflow for downloaded Sponza/Gallery test scenes.
+- Extended the OBJ renderer to read `vt` coordinates and MTL `map_Kd` diffuse textures, with material-color fallback.
+- Filtered noisy OBJ/MTL duplicate dissolve warnings from the scene-load status text.
+- Added movable scene camera controls with target offsets, reset, mouse orbit, and keyboard target movement.
+- Changed the scene list UX so selecting a scene immediately loads it; the explicit button now reloads the selected scene.
+- Hid source-specific controls outside their input mode: scene controls are not shown in image mode, and image file controls are not shown in scene mode.
+- Simplified the scene panel by keeping manifest and scene metadata in collapsible sections.
 
 Remaining decisions:
 

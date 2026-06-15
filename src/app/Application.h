@@ -54,6 +54,8 @@ private:
     void loadImageFromUi();
     void reloadSceneManifest();
     void loadSelectedScene();
+    void resetSceneCamera(float exposure);
+    void updateSceneCameraInput();
     void resizeSmaaTargets(int sourceWidth, int sourceHeight);
     void updateSmaa(GLuint sourceTexture, int sourceWidth, int sourceHeight);
     smaa_original::DebugTextures selectedDebugTextures() const;
@@ -86,6 +88,10 @@ private:
     int sceneRenderWidth_ = 1280;
     int sceneRenderHeight_ = 720;
     int selectedScene_ = -1;
+    bool rotatingSceneCamera_ = false;
+    double lastSceneCameraTime_ = 0.0;
+    double lastSceneCursorX_ = 0.0;
+    double lastSceneCursorY_ = 0.0;
 
     std::array<char, 1024> imagePath_{};
     std::array<char, 1024> sceneManifestPath_{};

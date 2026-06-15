@@ -24,6 +24,7 @@ public:
 
     void bind(GLuint unit) const;
     void setLinearClamp() const;
+    void setLinearRepeat() const;
     void setNearestClamp() const;
     void setLabel(std::string_view label) const;
 

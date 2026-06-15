@@ -3,10 +3,15 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#include <stb_image.h>
+
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace {
 
@@ -16,7 +21,14 @@ struct Vec3 {
     float z = 0.0f;
 };
 
+struct Vec2 {
+    float x = 0.0f;
+    float y = 0.0f;
+};
+
 using Mat4 = std::array<float, 16>;
+
+constexpr int kSceneVertexStride = 8;
 
 Vec3 operator-(Vec3 a, Vec3 b) {
     return Vec3{a.x - b.x, a.y - b.y, a.z - b.z};
@@ -137,12 +149,115 @@ Vec3 readNormal(const tinyobj::attrib_t& attrib, tinyobj::index_t index, Vec3 fa
     });
 }
 
+Vec2 readTexcoord(const tinyobj::attrib_t& attrib, tinyobj::index_t index) {
+    if (index.texcoord_index < 0) {
+        return {};
+    }
+    const int base = 2 * index.texcoord_index;
+    if (base + 1 >= static_cast<int>(attrib.texcoords.size())) {
+        return {};
+    }
+    return Vec2{
+        attrib.texcoords[static_cast<size_t>(base + 0)],
+        attrib.texcoords[static_cast<size_t>(base + 1)],
+    };
+}
+
 Vec3 materialColor(const std::vector<tinyobj::material_t>& materials, int materialId) {
     if (materialId >= 0 && materialId < static_cast<int>(materials.size())) {
         const auto& material = materials[static_cast<size_t>(materialId)];
         return Vec3{material.diffuse[0], material.diffuse[1], material.diffuse[2]};
     }
     return Vec3{0.74f, 0.76f, 0.78f};
+}
+
+std::string textureFileName(std::string text) {
+    std::replace(text.begin(), text.end(), '\\', '/');
+    if (text.find_first_of(" \t\r\n") == std::string::npos) {
+        return text;
+    }
+
+    std::istringstream stream(text);
+    std::string token;
+    std::string lastToken;
+    while (stream >> token) {
+        lastToken = token;
+    }
+    return lastToken;
+}
+
+std::filesystem::path resolveTexturePath(const std::filesystem::path& root, const std::string& textureName) {
+    const auto cleanName = textureFileName(textureName);
+    const std::filesystem::path texturePath(cleanName);
+    if (texturePath.is_absolute()) {
+        return texturePath;
+    }
+    return root / texturePath;
+}
+
+void appendWarning(std::string& warning, const std::string& text) {
+    if (text.empty()) {
+        return;
+    }
+    if (!warning.empty()) {
+        warning += "\n";
+    }
+    warning += text;
+}
+
+std::string filterReaderWarnings(const std::string& text) {
+    std::istringstream stream(text);
+    std::string line;
+    std::string filtered;
+    bool skipDissolveFollowup = false;
+    int suppressedDissolveWarnings = 0;
+
+    while (std::getline(stream, line)) {
+        if (line.find("Both `d` and `Tr`") != std::string::npos) {
+            skipDissolveFollowup = true;
+            ++suppressedDissolveWarnings;
+            continue;
+        }
+        if (skipDissolveFollowup && line.find("Use the value of `d`") != std::string::npos) {
+            skipDissolveFollowup = false;
+            continue;
+        }
+
+        skipDissolveFollowup = false;
+        appendWarning(filtered, line);
+    }
+
+    if (suppressedDissolveWarnings > 0) {
+        appendWarning(filtered, "Suppressed " + std::to_string(suppressedDissolveWarnings) + " duplicate MTL dissolve warnings.");
+    }
+    return filtered;
+}
+
+bool loadRgbaTexture(const std::filesystem::path& path, gl::Texture2D& texture, std::string& warning) {
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+
+    stbi_set_flip_vertically_on_load(1);
+    stbi_uc* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
+    stbi_set_flip_vertically_on_load(0);
+
+    if (pixels == nullptr) {
+        const char* reason = stbi_failure_reason();
+        warning = "Failed to load diffuse texture " + path.string();
+        if (reason != nullptr) {
+            warning += ": ";
+            warning += reason;
+        }
+        return false;
+    }
+
+    texture.createRgba8(width, height, pixels);
+    texture.setLinearRepeat();
+    texture.setLabel(path.filename().string());
+    stbi_image_free(pixels);
+    warning.clear();
+    return true;
 }
 
 } // namespace
@@ -184,6 +299,8 @@ void SceneRenderer::release() {
     }
     program_ = gl::ShaderProgram();
     colorTex_ = gl::Texture2D();
+    materials_.clear();
+    batches_.clear();
     vertexCount_ = 0;
 }
 
@@ -204,18 +321,37 @@ bool SceneRenderer::loadObjScene(
         return false;
     }
 
-    if (!reader.Warning().empty()) {
-        error = reader.Warning();
-    } else {
-        error.clear();
-    }
+    std::string warnings = filterReaderWarnings(reader.Warning());
 
     const auto& attrib = reader.GetAttrib();
     const auto& shapes = reader.GetShapes();
     const auto& materials = reader.GetMaterials();
 
+    std::vector<SceneMaterial> loadedMaterials;
+    loadedMaterials.reserve(materials.size() + 1);
+    for (int materialId = 0; materialId < static_cast<int>(materials.size()); ++materialId) {
+        const auto& sourceMaterial = materials[static_cast<size_t>(materialId)];
+        SceneMaterial material;
+        const Vec3 diffuse = materialColor(materials, materialId);
+        material.diffuseColor = {diffuse.x, diffuse.y, diffuse.z};
+
+        if (!sourceMaterial.diffuse_texname.empty()) {
+            const auto texturePath = resolveTexturePath(root, sourceMaterial.diffuse_texname);
+            std::string textureWarning;
+            material.hasDiffuseTexture = loadRgbaTexture(texturePath, material.diffuseTexture, textureWarning);
+            appendWarning(warnings, textureWarning);
+        }
+
+        loadedMaterials.push_back(std::move(material));
+    }
+
+    SceneMaterial fallbackMaterial;
+    loadedMaterials.push_back(std::move(fallbackMaterial));
+    const int fallbackMaterialIndex = static_cast<int>(loadedMaterials.size() - 1);
+
     std::vector<float> vertices;
-    vertices.reserve(attrib.vertices.size() * 3);
+    vertices.reserve((attrib.vertices.size() / 3) * kSceneVertexStride);
+    std::vector<MeshBatch> loadedBatches;
 
     bool boundsInitialized = false;
     Bounds bounds;
@@ -236,13 +372,24 @@ bool SceneRenderer::loadObjScene(
             const Vec3 p1 = readPosition(attrib, i1);
             const Vec3 p2 = readPosition(attrib, i2);
             const Vec3 faceNormal = normalize(cross(p1 - p0, p2 - p0));
-            const Vec3 color = materialColor(materials, shape.mesh.material_ids.empty() ? -1 : shape.mesh.material_ids[face]);
+            const int faceMaterialId = face < shape.mesh.material_ids.size() ? shape.mesh.material_ids[face] : -1;
+            const int materialIndex =
+                faceMaterialId >= 0 && faceMaterialId < static_cast<int>(materials.size()) ? faceMaterialId : fallbackMaterialIndex;
+
+            if (loadedBatches.empty() || loadedBatches.back().materialIndex != materialIndex) {
+                loadedBatches.push_back(MeshBatch{
+                    static_cast<GLsizei>(vertices.size() / kSceneVertexStride),
+                    0,
+                    materialIndex,
+                });
+            }
 
             const std::array<tinyobj::index_t, 3> indices = {i0, i1, i2};
             const std::array<Vec3, 3> positions = {p0, p1, p2};
             for (size_t v = 0; v < 3; ++v) {
                 const Vec3 normal = readNormal(attrib, indices[v], faceNormal);
                 const Vec3 position = positions[v];
+                const Vec2 texcoord = readTexcoord(attrib, indices[v]);
 
                 if (!boundsInitialized) {
                     bounds = Bounds{position.x, position.y, position.z, position.x, position.y, position.z};
@@ -259,10 +406,11 @@ bool SceneRenderer::loadObjScene(
                 vertices.insert(vertices.end(), {
                     position.x, position.y, position.z,
                     normal.x, normal.y, normal.z,
-                    color.x, color.y, color.z,
+                    texcoord.x, texcoord.y,
                 });
             }
 
+            loadedBatches.back().vertexCount += 3;
             indexOffset += 3;
         }
     }
@@ -274,7 +422,10 @@ bool SceneRenderer::loadObjScene(
 
     bounds_ = bounds;
     label_ = entry.name;
+    materials_ = std::move(loadedMaterials);
+    batches_ = std::move(loadedBatches);
     uploadVertices(vertices);
+    error = std::move(warnings);
     return true;
 }
 
@@ -296,7 +447,7 @@ void SceneRenderer::render(const SceneCamera& camera) {
         return;
     }
 
-    const Vec3 center{
+    const Vec3 boundsCenter{
         (bounds_.minX + bounds_.maxX) * 0.5f,
         (bounds_.minY + bounds_.maxY) * 0.5f,
         (bounds_.minZ + bounds_.maxZ) * 0.5f,
@@ -307,6 +458,11 @@ void SceneRenderer::render(const SceneCamera& camera) {
         bounds_.maxZ - bounds_.minZ,
     };
     const float radius = std::max({extent.x, extent.y, extent.z, 0.001f}) * 0.5f;
+    const Vec3 center = boundsCenter + Vec3{
+        camera.targetOffsetX,
+        camera.targetOffsetY,
+        camera.targetOffsetZ,
+    } * radius;
     const float cp = std::cos(camera.pitch);
     const Vec3 eye = center + Vec3{
         std::sin(camera.yaw) * cp,
@@ -315,7 +471,8 @@ void SceneRenderer::render(const SceneCamera& camera) {
     } * (radius * camera.distance);
 
     const Mat4 view = lookAt(eye, center, Vec3{0.0f, 1.0f, 0.0f});
-    const Mat4 proj = perspective(60.0f * 3.14159265f / 180.0f, static_cast<float>(width_) / static_cast<float>(height_), radius * 0.01f, radius * 20.0f);
+    const float fovRadians = std::clamp(camera.fovDegrees, 25.0f, 100.0f) * 3.14159265f / 180.0f;
+    const Mat4 proj = perspective(fovRadians, static_cast<float>(width_) / static_cast<float>(height_), radius * 0.005f, radius * 20.0f);
     const Mat4 mvp = multiply(proj, view);
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
@@ -328,8 +485,25 @@ void SceneRenderer::render(const SceneCamera& camera) {
     program_.use();
     glUniformMatrix4fv(glGetUniformLocation(program_.id(), "u_mvp"), 1, GL_FALSE, mvp.data());
     program_.setFloat("u_exposure", camera.exposure);
+    program_.setInt("u_diffuseTex", 0);
+
     glBindVertexArray(vao_);
-    glDrawArrays(GL_TRIANGLES, 0, vertexCount_);
+    for (const auto& batch : batches_) {
+        const auto materialIndex =
+            batch.materialIndex >= 0 && batch.materialIndex < static_cast<int>(materials_.size()) ? batch.materialIndex : 0;
+        const auto& material = materials_[static_cast<size_t>(materialIndex)];
+        program_.setVec4(
+            "u_materialColor",
+            material.diffuseColor[0],
+            material.diffuseColor[1],
+            material.diffuseColor[2],
+            1.0f);
+        program_.setInt("u_useDiffuseTexture", material.hasDiffuseTexture ? 1 : 0);
+        if (material.hasDiffuseTexture) {
+            material.diffuseTexture.bind(0);
+        }
+        glDrawArrays(GL_TRIANGLES, batch.firstVertex, batch.vertexCount);
+    }
     glBindVertexArray(0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -354,19 +528,19 @@ void SceneRenderer::createFramebuffer() {
 }
 
 void SceneRenderer::uploadVertices(const std::vector<float>& vertices) {
-    vertexCount_ = static_cast<GLsizei>(vertices.size() / 9);
+    vertexCount_ = static_cast<GLsizei>(vertices.size() / kSceneVertexStride);
 
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(float)), vertices.data(), GL_STATIC_DRAW);
 
-    constexpr GLsizei stride = 9 * sizeof(float);
+    constexpr GLsizei stride = kSceneVertexStride * sizeof(float);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(3 * sizeof(float)));
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(6 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<void*>(6 * sizeof(float)));
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);

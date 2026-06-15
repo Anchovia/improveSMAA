@@ -120,6 +120,12 @@ Proposed manifest shape:
 assets/scenes/scenes.json
 ```
 
+Machine-specific downloaded scenes should use an ignored local manifest:
+
+```text
+assets/scenes/local.scenes.json
+```
+
 Each scene entry should describe:
 
 - `name`
@@ -134,10 +140,17 @@ Initial supported scene formats should stay narrow:
 
 - static images first
 - OBJ scenes first through `tinyobjloader`
+- diffuse texture support through OBJ `vt` coordinates and MTL `map_Kd`
 - glTF/GLB or broader import later through Assimp if needed
 - additional formats only when a specific test scene requires them
 
 The renderer should output one resolved scene color texture. SMAA should not know whether that texture came from an image or a 3D scene.
+
+Current scene rendering is intentionally utilitarian. It supports material diffuse color and diffuse texture sampling for AA test visibility, but does not yet aim to reproduce archive reference renders with full lighting, normal maps, specular maps, or physically based materials.
+
+Scene navigation should be practical enough for repeatable AA captures. The current camera is an orbit camera with target offsets, FOV, exposure, mouse orbit, and keyboard movement. Per-scene saved camera presets can be added after Sponza/Gallery framing is validated.
+
+The UI should keep source-specific controls out of unrelated workflows. Image mode shows image loading controls only; scene mode shows scene selection, render size, and camera controls. Scene entries should load on selection, with a reload action only for explicitly refreshing the current scene.
 
 ## Original SMAA Isolation
 
