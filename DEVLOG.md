@@ -54,6 +54,8 @@ Implementation added:
 - Reworked the main UI around a CMAA2-style Source selector that lists generated pattern, discovered test images, and registered OBJ scenes together.
 - Moved image path editing, scene metadata, render size, and camera controls into Advanced so normal image testing is not polluted by scene controls.
 - Changed source selection to queue load requests and process them at the start of the next frame instead of loading scenes directly from ImGui selection callbacks.
+- Added Amazon Lumberyard Bistro Exterior and Interior as bundled OBJ scene entries, preserving the five-folder archive layout so MTL texture references remain valid.
+- Added Git LFS tracking for bundled Bistro OBJ and PNG data because the exterior/interior OBJ files exceed GitHub's normal file-size limit.
 
 Remaining decisions:
 

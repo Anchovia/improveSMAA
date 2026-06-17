@@ -17,6 +17,24 @@
       "default_camera": "main",
       "exposure": 1.0,
       "notes": "Bundled from McGuire Computer Graphics Archive. CC BY-SA 4.0. Copyright 2017 The Hallwyl Museum."
+    },
+    {
+      "name": "Amazon Lumberyard Bistro Exterior",
+      "root": "vendor/amazon_lumberyard_bistro/Exterior",
+      "asset": "exterior.obj",
+      "format": "obj",
+      "default_camera": "main",
+      "exposure": 1.0,
+      "notes": "Bundled from McGuire Computer Graphics Archive / NVIDIA ORCA Amazon Lumberyard Bistro. CC BY 4.0. Copyright 2017 Amazon Lumberyard."
+    },
+    {
+      "name": "Amazon Lumberyard Bistro Interior",
+      "root": "vendor/amazon_lumberyard_bistro/Interior",
+      "asset": "interior.obj",
+      "format": "obj",
+      "default_camera": "main",
+      "exposure": 1.0,
+      "notes": "Bundled from McGuire Computer Graphics Archive / NVIDIA ORCA Amazon Lumberyard Bistro. CC BY 4.0. Copyright 2017 Amazon Lumberyard."
     }
   ]
 }

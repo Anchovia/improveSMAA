@@ -1,0 +1,2 @@
+assets/scenes/vendor/amazon_lumberyard_bistro/**/*.obj filter=lfs diff=lfs merge=lfs -text
+assets/scenes/vendor/amazon_lumberyard_bistro/**/*.png filter=lfs diff=lfs merge=lfs -text

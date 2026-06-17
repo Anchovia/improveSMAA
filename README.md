@@ -32,7 +32,7 @@ Reference boundary:
 
 - `iryoku/smaa` is the algorithm baseline. Its `SMAA.hlsl`, `AreaTex`, and `SearchTex` assets should be treated as source-of-truth inputs.
 - `GameTechDev/CMAA2` is only a demo and tooling reference. Useful ideas include static-image testing, AA mode switching, zoom inspection, reference capture, visual difference display, and benchmark panels.
-- `casual-effects.com/data` is a scene/test-data reference. The demo should make downloaded scenes easy to register and test, but should not require large third-party scene packages to be committed to this repository.
+- `casual-effects.com/data` is a scene/test-data reference. The demo should make downloaded scenes easy to register and test. Large third-party scene packages stay out of git by default unless explicitly curated as bundled scenes, using Git LFS when file size requires it.
 
 ## Proposed First Milestone
 
@@ -98,6 +98,7 @@ These are still worth deciding after the first code pass:
 - Adaptive SMAA and Adaptive + TSCMAA SMAA placeholder modes. They currently run the same copied SMAA 1x pipeline and have separate shader directories for experiments.
 - View modes for final, split, difference, edges, and blend weights.
 - Scene manifest loading defaults to bundled `assets/scenes/scenes.json`; an ignored `assets/scenes/local.scenes.json` can still be selected manually from Advanced for machine-specific scene paths.
+- Bundled OBJ scenes currently include Crytek Sponza, Gallery, and Amazon Lumberyard Bistro Exterior/Interior.
 - A unified Source selector lists the generated pattern, images discovered under `assets/test_images/`, and registered OBJ scenes.
 - Source changes are queued from the UI and loaded at the start of the next frame instead of performing heavy scene loads inside ImGui widget handling.
 - Source-specific details live under Advanced: image path controls stay separate from scene render/camera controls, and scene controls are hidden during normal image testing.

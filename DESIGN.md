@@ -8,7 +8,7 @@ This document defines the intended shape of the demo before implementation start
 - A rendered 3D scene can be added after the image path is correct, but the design should reserve a clean scene-library path from the start.
 - Original SMAA means the algorithm and lookup textures from `iryoku/smaa`.
 - CMAA2 is a UI/tooling reference, not an implementation dependency.
-- External scene archives, including scenes from the McGuire Computer Graphics Archive, should be user-added data rather than required repository contents.
+- External scene archives, including scenes from the McGuire Computer Graphics Archive, should be user-added data by default. Explicitly curated bundled scenes may live under `assets/scenes/vendor/`, with Git LFS for very large binary scene data.
 - The user will build locally; this project should provide code and CMake, not require the agent to run builds.
 
 ## Success Criteria
@@ -111,7 +111,7 @@ Scene-library goals:
 - List registered scenes in the UI.
 - Store per-scene metadata such as display name, root path, main asset file, default camera, scale, and notes.
 - Allow scene reload/rescan while developing.
-- Keep large downloaded data out of git by default.
+- Keep large downloaded data out of git by default, except explicitly curated bundled test scenes.
 - Preserve repeatability by saving camera and render settings used for a comparison.
 
 Proposed manifest shape:
@@ -147,6 +147,8 @@ Initial supported scene formats should stay narrow:
 The renderer should output one resolved scene color texture. SMAA should not know whether that texture came from an image or a 3D scene.
 
 Current scene rendering is intentionally utilitarian. It supports material diffuse color and diffuse texture sampling for AA test visibility, but does not yet aim to reproduce archive reference renders with full lighting, normal maps, specular maps, or physically based materials.
+
+Bundled scene packages must preserve the archive's relative texture layout. For example, Amazon Lumberyard Bistro is registered as separate Exterior and Interior OBJ entries while keeping `BuildingTextures`, `OtherTextures`, and `PropTextures` as shared sibling folders.
 
 Scene navigation should be practical enough for repeatable AA captures. The current camera is a third-person orbit camera with target/pivot offsets, yaw/pitch, target distance, FOV, exposure, middle-mouse orbit toggle, mouse-wheel distance zoom, WASD view-relative target movement, Q/E yaw rotation, Shift move speed boost, and reset. Per-scene saved camera presets can be added after Sponza/Gallery framing is validated.
 
